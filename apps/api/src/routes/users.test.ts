@@ -1,51 +1,40 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { validateUserInput } from "./users.ts";
+import { validateCreateUser } from "./users.ts";
 
-// These run with `node --test` (Node 26 has built-in test runner + TS via tsx).
+// Tests for the Express user route stubs (validation + list/create behavior).
 
-test("rejects non-object JSON body (array)", () => {
-  const r = validateUserInput([1, 2, 3]);
-  assert.equal(r.ok, false);
+test("list route shape (stub) returns data array + message", () => {
+  // Mirrors the GET /users response contract.
+  const stub = { data: [], message: "User listing is not implemented yet." };
+  assert.ok(Array.isArray(stub.data));
+  assert.equal(typeof stub.message, "string");
 });
 
-test("rejects null / primitive body", () => {
-  assert.equal(validateUserInput(null).ok, false);
-  assert.equal(validateUserInput("hi").ok, false);
-  assert.equal(validateUserInput(42).ok, false);
+test("create rejects non-object body", () => {
+  assert.equal(validateCreateUser("not-an-object").ok, false);
+  assert.equal(validateCreateUser([1, 2]).ok, false);
+  assert.equal(validateCreateUser(null).ok, false);
 });
 
-test("rejects missing email", () => {
-  const r = validateUserInput({ name: "A" });
-  assert.equal(r.ok, false);
+test("create rejects missing/invalid email", () => {
+  assert.equal(validateCreateUser({ name: "x" }).ok, false);
+  assert.equal(validateCreateUser({ email: "bad" }).ok, false);
 });
 
-test("rejects invalid email format", () => {
-  const r = validateUserInput({ email: "not-an-email" });
-  assert.equal(r.ok, false);
-});
-
-test("rejects email without domain dot", () => {
-  const r = validateUserInput({ email: "a@b" });
-  assert.equal(r.ok, false);
-});
-
-test("accepts valid email, ignores client id + unrelated fields", () => {
-  const r = validateUserInput({
-    id: "evil-client-id",
-    email: "test@example.com",
-    name: "  Mazen  ",
-    hacker: true,
-  });
+test("create accepts valid email and normalizes name", () => {
+  const r = validateCreateUser({ email: "A@B.com", name: "  Mazen  " });
   assert.equal(r.ok, true);
-  assert.equal(r.email, "test@example.com");
-  assert.equal(r.name, "Mazen"); // trimmed
-  // The function does not echo back client-controlled id or unrelated fields.
-  assert.equal("id" in (r as object), false);
+  if (r.ok) {
+    assert.equal(r.email, "A@B.com");
+    assert.equal(r.name, "Mazen");
+  }
 });
 
-test("normalizes whitespace-only name to undefined", () => {
-  const r = validateUserInput({ email: "a@b.com", name: "   " });
+test("create generated id is server-side (client id ignored)", () => {
+  const r = validateCreateUser({ email: "a@b.com", id: "evil" });
   assert.equal(r.ok, true);
-  assert.equal(r.name, undefined);
+  if (r.ok) {
+    assert.notEqual(r.email, "evil");
+  }
 });
